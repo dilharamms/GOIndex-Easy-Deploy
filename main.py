@@ -88,6 +88,11 @@ QLabel#SubHeaderLabel {
     color: #64748b;
     margin-bottom: 12px;
 }
+QLabel#HelpTip {
+    font-size: 12px;
+    color: #64748b;
+    font-style: italic;
+}
 QLineEdit, QComboBox {
     background-color: #ffffff;
     border: 1px solid #cbd5e1;
@@ -306,33 +311,47 @@ class RcloneConfiguratorApp(QMainWindow):
         
         grid_oauth = QGridLayout()
         grid_oauth.addWidget(QLabel("Client ID:"), 0, 0)
-        self.txt_client_id = QLineEdit("202264815644.apps.googleusercontent.com")
+        self.txt_client_id = QLineEdit()
+        self.txt_client_id.setPlaceholderText("Enter Client ID")
         grid_oauth.addWidget(self.txt_client_id, 0, 1)
 
         grid_oauth.addWidget(QLabel("Client Secret:"), 1, 0)
-        self.txt_client_secret = QLineEdit("X4Z3ca8xfWDb1Voo-F9a7ZxJ")
+        self.txt_client_secret = QLineEdit()
+        self.txt_client_secret.setPlaceholderText("Enter Client Secret")
         self.txt_client_secret.setEchoMode(QLineEdit.Password)
         grid_oauth.addWidget(self.txt_client_secret, 1, 1)
 
-        self.btn_authorize = QPushButton("Start Local OAuth Authorization")
+        lbl_tip = QLabel("Supports both 'Desktop App' (Recommended) & 'Web Application' credentials. See Guide tab for details.")
+        lbl_tip.setObjectName("HelpTip")
+
+        self.btn_authorize = QPushButton("Start OAuth Authorization")
         self.btn_authorize.clicked.connect(self.start_auth)
 
         layout_auth.addLayout(grid_oauth)
+        layout_auth.addWidget(lbl_tip)
         layout_auth.addWidget(self.btn_authorize)
 
-        # --- GROUP 2: REFRESH TOKEN ---
-        grp_token = QGroupBox("2. Refresh Token")
-        layout_token = QHBoxLayout(grp_token)
-        
+        # --- GROUP 2: REFRESH TOKEN (AUTOMATIC OR MANUAL) ---
+        grp_token = QGroupBox("2. Refresh Token (Auto-captured or Paste Manually)")
+        layout_token = QVBoxLayout(grp_token)
+
+        token_row = QHBoxLayout()
         self.txt_refresh_token = QLineEdit()
-        self.txt_refresh_token.setPlaceholderText("Refresh token will automatically appear here after authorization...")
-        
+        self.txt_refresh_token.setPlaceholderText("Refresh token will auto-appear after OAuth, or paste token / raw JSON here...")
+        self.txt_refresh_token.textChanged.connect(self.on_token_text_changed)
+
         self.btn_copy_token = QPushButton("Copy Token")
         self.btn_copy_token.setObjectName("SecondaryButton")
         self.btn_copy_token.clicked.connect(self.copy_refresh_token)
 
-        layout_token.addWidget(self.txt_refresh_token)
-        layout_token.addWidget(self.btn_copy_token)
+        token_row.addWidget(self.txt_refresh_token)
+        token_row.addWidget(self.btn_copy_token)
+
+        lbl_manual_tip = QLabel("Tip: You can also paste raw JSON from Rclone CLI here—the app will automatically parse the refresh_token!")
+        lbl_manual_tip.setObjectName("HelpTip")
+
+        layout_token.addLayout(token_row)
+        layout_token.addWidget(lbl_manual_tip)
 
         # --- GROUP 3: DRIVE CONFIGURATION ---
         grp_drive = QGroupBox("3. Drive Configuration")
@@ -461,7 +480,7 @@ class RcloneConfiguratorApp(QMainWindow):
         layout = QVBoxLayout(page)
         layout.setContentsMargins(25, 25, 25, 25)
 
-        header = QLabel("Google Drive & Worker Deployment Guide")
+        header = QLabel("Google OAuth & Worker Deployment Guide")
         header.setObjectName("HeaderLabel")
 
         guide_text = QTextEdit()
@@ -474,45 +493,59 @@ class RcloneConfiguratorApp(QMainWindow):
                 font-size: 13px;
                 border: 1px solid #cbd5e1;
                 border-radius: 6px;
-                padding: 12px;
+                padding: 15px;
             }
         """)
 
         guide_content = """
-        <h2>Why is local auth needed?</h2>
-        <p>Google deprecated Out-Of-Band (OOB) OAuth flow (<code>urn:ietf:wg:oauth:2.0:oob</code>), preventing remote environments from pasting an auth code directly.</p>
+        <h2>Google OAuth Setup Guide (Both Credentials Methods Supported)</h2>
+        <p>Because Google deprecated the Out-Of-Band (OOB) OAuth flow (<code>urn:ietf:wg:oauth:2.0:oob</code>), remote environments like Google Colab can no longer display an auth code to copy manually.</p>
         <p>This desktop application runs <b>Rclone</b> locally on your computer to open a local web server (<code>http://127.0.0.1:53682/</code>), allowing you to safely authenticate with Google and automatically capture your <b>Refresh Token</b>.</p>
 
         <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 15px 0;">
 
-        <h3>Step-by-Step Setup:</h3>
+        <h3 style="color: #2563eb;">METHOD 1: Desktop Application Credentials (Recommended - Zero Configuration)</h3>
+        <p><i>Desktop credentials automatically allow local loopback authorization (<code>http://127.0.0.1:53682/</code>) without needing any manual redirect URIs configured.</i></p>
         <ol>
-            <li><b>Create Google Credentials:</b>
-                <ul>
-                    <li>Go to the <a style="color: #2563eb;" href="https://console.cloud.google.com/">Google Cloud Console</a>.</li>
-                    <li>Create a project and enable the <b>Google Drive API</b>.</li>
-                    <li>Go to <b>Credentials</b> &rarr; <b>Create Credentials</b> &rarr; <b>OAuth Client ID</b>.</li>
-                    <li>Select Application type: <b>Desktop App</b>.</li>
-                    <li>Copy your <b>Client ID</b> and <b>Client Secret</b> into this app.</li>
+            <li>Go to the <a style="color: #2563eb; font-weight: bold;" href="https://console.cloud.google.com/apis/credentials">Google Cloud Console Credentials Page</a>.</li>
+            <li>Click <b>+ CREATE CREDENTIALS</b> at the top and select <b>OAuth client ID</b>.</li>
+            <li>Under <b>Application type</b>, select <b>Desktop app</b>.</li>
+            <li>Enter any name (e.g., <i>GoIndex Generator</i>) and click <b>CREATE</b>.</li>
+            <li>Copy your new <b>Client ID</b> and <b>Client Secret</b> into Section 1 of this app.</li>
+            <li>Click <b>Start OAuth Authorization</b>. Your browser will open, sign in to Google, and your token will be captured automatically!</li>
+        </ol>
+
+        <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 15px 0;">
+
+        <h3 style="color: #0284c7;">METHOD 2: Web Application Credentials (If Using Existing Web Client ID)</h3>
+        <p><i>If your Client ID is created as a "Web application", Google requires adding the local Rclone redirect URI manually to prevent <b>Error 400: redirect_uri_mismatch</b>.</i></p>
+        <ol>
+            <li>Go to the <a style="color: #2563eb; font-weight: bold;" href="https://console.cloud.google.com/apis/credentials">Google Cloud Console Credentials Page</a>.</li>
+            <li>Under <b>OAuth 2.0 Client IDs</b>, click your existing Client ID to edit it.</li>
+            <li>Scroll down to <b>Authorized redirect URIs</b> and click <b>+ ADD URI</b>.</li>
+            <li>Add both of the following URIs:
+                <ul style="margin-top: 5px;">
+                    <li><code>http://127.0.0.1:53682/</code></li>
+                    <li><code>http://localhost:53682/</code></li>
                 </ul>
             </li>
-            <br>
-            <li><b>Perform Local OAuth:</b>
-                <ul>
-                    <li>Click <b>Start Local OAuth Authorization</b>.</li>
-                    <li>Your default browser will open automatically for Google login.</li>
-                    <li>Grant permissions and return here—your <b>Refresh Token</b> and <b>Worker Code</b> will generate automatically!</li>
-                </ul>
-            </li>
-            <br>
-            <li><b>Deploy to Cloudflare Workers:</b>
-                <ul>
-                    <li>Go to the <a style="color: #2563eb;" href="https://dash.cloudflare.com/">Cloudflare Dashboard</a> &rarr; <b>Workers & Pages</b>.</li>
-                    <li>Create a new Worker script.</li>
-                    <li>Click <b>Copy Worker Code</b> or <b>Download index.js</b> in this app.</li>
-                    <li>Paste the code into the Cloudflare Worker editor and click <b>Save and Deploy</b>!</li>
-                </ul>
-            </li>
+            <li>Click <b>SAVE</b> at the bottom and wait ~60 seconds for Google to update settings.</li>
+            <li>Return to this app and click <b>Start OAuth Authorization</b>.</li>
+        </ol>
+
+        <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 15px 0;">
+
+        <h3 style="color: #16a34a;">METHOD 3: Direct Refresh Token or JSON Paste</h3>
+        <p>If you already have a <b>Refresh Token</b> (or raw JSON output from Rclone CLI), you can simply paste it directly into the <b>Refresh Token</b> field (Section 2) or paste the full JSON block. The app will automatically extract the token and let you click <b>Generate GoIndex Worker Code</b> immediately!</p>
+
+        <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 15px 0;">
+
+        <h3>Deploying to Cloudflare Workers:</h3>
+        <ol>
+            <li>Log into the <a style="color: #2563eb;" href="https://dash.cloudflare.com/">Cloudflare Dashboard</a> &rarr; <b>Workers & Pages</b>.</li>
+            <li>Create a new Worker script.</li>
+            <li>Click <b>Copy Worker Code</b> or <b>Download index.js</b> in this app.</li>
+            <li>Paste the generated code into the Cloudflare Worker editor and click <b>Save and Deploy</b>!</li>
         </ol>
         """
         guide_text.setHtml(guide_content)
@@ -578,6 +611,20 @@ class RcloneConfiguratorApp(QMainWindow):
         self.lbl_rclone_status.setStyleSheet("color: #dc2626; font-weight: bold;")
         QMessageBox.critical(self, "Error", f"Failed to download Rclone automatically:\n{err}")
 
+    def kill_existing_rclone_processes(self):
+        try:
+            system = platform.system().lower()
+            if "win" in system:
+                subprocess.run(["taskkill", "/F", "/IM", "rclone.exe"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            else:
+                subprocess.run(["pkill", "-f", "rclone"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        except Exception:
+            pass
+
+    def closeEvent(self, event):
+        self.kill_existing_rclone_processes()
+        event.accept()
+
     def start_auth(self):
         client_id = self.txt_client_id.text().strip()
         client_secret = self.txt_client_secret.text().strip()
@@ -590,6 +637,9 @@ class RcloneConfiguratorApp(QMainWindow):
         if not rclone_path and not os.path.exists(self.rclone_bin):
             QMessageBox.warning(self, "Rclone Missing", "Rclone binary is not available yet. Please wait for the automatic download to finish.")
             return
+
+        # Clean up any lingering rclone processes holding port 53682
+        self.kill_existing_rclone_processes()
 
         active_rclone = rclone_path if rclone_path else self.rclone_bin
 
@@ -624,8 +674,45 @@ class RcloneConfiguratorApp(QMainWindow):
 
     def on_auth_error(self, err):
         self.btn_authorize.setEnabled(True)
-        self.txt_output.setText(f"Error:\n{err}")
-        QMessageBox.critical(self, "Authorization Error", f"Failed to authorize:\n{err}")
+        self.kill_existing_rclone_processes()
+        if "redirect_uri_mismatch" in err:
+            msg = (
+                "Google OAuth Error: Error 400: redirect_uri_mismatch\n\n"
+                "HOW TO FIX THIS IN GOOGLE CLOUD CONSOLE:\n\n"
+                "METHOD 1 (Recommended):\n"
+                "1. Go to Google Cloud Console -> Credentials.\n"
+                "2. Click '+ CREATE CREDENTIALS' -> 'OAuth client ID'.\n"
+                "3. Select Application type: 'Desktop app' (NOT Web application).\n"
+                "4. Copy the new Client ID & Client Secret into this app.\n\n"
+                "METHOD 2 (If using 'Web application'):\n"
+                "1. In Credentials, edit your OAuth Client ID.\n"
+                "2. Under 'Authorized redirect URIs', click '+ ADD URI'.\n"
+                "3. Add: http://127.0.0.1:53682/\n"
+                "4. Save changes, wait 60s, and try authorization again."
+            )
+            self.txt_output.setText(f"Error:\n{err}\n\n{msg}")
+            QMessageBox.critical(self, "Redirect URI Mismatch Error", msg)
+        elif "53682" in err or "bind" in err:
+            msg = "Port 53682 was in use by a previous Rclone process.\nLingering processes have been terminated automatically.\nPlease click 'Start OAuth Authorization' again."
+            self.txt_output.setText(f"Error:\n{err}\n\n{msg}")
+            QMessageBox.warning(self, "Port Conflict Resolved", msg)
+        else:
+            self.txt_output.setText(f"Error:\n{err}")
+            QMessageBox.critical(self, "Authorization Error", f"Failed to authorize:\n{err}")
+
+    def on_token_text_changed(self, text):
+        text = text.strip()
+        if text.startswith("{") and text.endswith("}"):
+            try:
+                data = json.loads(text)
+                ref_tok = data.get("refresh_token", "")
+                if ref_tok:
+                    self.txt_refresh_token.blockSignals(True)
+                    self.txt_refresh_token.setText(ref_tok)
+                    self.txt_refresh_token.blockSignals(False)
+                    self.txt_output.append(f"Parsed refresh_token from JSON: {ref_tok}\n")
+            except Exception:
+                pass
 
     def copy_refresh_token(self):
         token = self.txt_refresh_token.text().strip()
@@ -697,7 +784,7 @@ class RcloneConfiguratorApp(QMainWindow):
         hide_actions_tab = self.chk_hide_actions.isChecked()
 
         if not refresh_token:
-            QMessageBox.warning(self, "Missing Refresh Token", "Please start local authorization first to generate a refresh token, or enter one manually.")
+            QMessageBox.warning(self, "Missing Refresh Token", "Please start local authorization first to generate a refresh token, or enter/paste one manually.")
             return
 
         template_content = self.load_template()
