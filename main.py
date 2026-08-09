@@ -11,8 +11,29 @@ from PySide6.QtWidgets import (
     QListWidget, QFrame, QMessageBox, QProgressBar, QComboBox,
     QCheckBox, QScrollArea, QFileDialog, QGroupBox, QGridLayout
 )
-from PySide6.QtCore import Qt, QThread, Signal
-from PySide6.QtGui import QFont
+from PySide6.QtCore import Qt, QThread, Signal, QByteArray, QSize
+from PySide6.QtGui import QFont, QIcon, QPixmap, QPainter
+from PySide6.QtSvg import QSvgRenderer
+
+# --- SVG ICONS ---
+SVG_EYE = """<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#475569" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+  <circle cx="12" cy="12" r="3"/>
+</svg>"""
+
+SVG_EYE_OFF = """<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#475569" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/>
+  <line x1="1" y1="1" x2="23" y2="23"/>
+</svg>"""
+
+def create_svg_icon(svg_content, size=24):
+    renderer = QSvgRenderer(QByteArray(svg_content.encode('utf-8')))
+    pixmap = QPixmap(size, size)
+    pixmap.fill(Qt.transparent)
+    painter = QPainter(pixmap)
+    renderer.render(painter)
+    painter.end()
+    return QIcon(pixmap)
 
 # --- STYLESHEET (Minimal & Modern Light Theme) ---
 MODERN_STYLE = """
@@ -223,6 +244,7 @@ class AuthWorker(QThread):
         self.rclone_path = rclone_path
         self.client_id = client_id
         self.client_secret = client_secret
+        self.process = None
 
     def run(self):
         try:
@@ -231,17 +253,25 @@ class AuthWorker(QThread):
                 self.client_id, self.client_secret
             ]
             
-            process = subprocess.Popen(
+            self.process = subprocess.Popen(
                 cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True
             )
-            stdout, stderr = process.communicate()
+            stdout, stderr = self.process.communicate()
 
-            if process.returncode == 0:
+            if self.process and self.process.returncode == 0:
                 self.finished.emit(stdout)
             else:
                 self.error.emit(stderr if stderr else "Authorization failed.")
         except Exception as e:
             self.error.emit(str(e))
+
+    def stop(self):
+        if self.process:
+            try:
+                self.process.terminate()
+                self.process.kill()
+            except Exception:
+                pass
 
 
 # --- MAIN APPLICATION WINDOW ---
@@ -253,6 +283,9 @@ class RcloneConfiguratorApp(QMainWindow):
         self.setStyleSheet(MODERN_STYLE)
 
         self.rclone_bin = "rclone.exe" if platform.system().lower() == "windows" else "rclone"
+
+        self.icon_eye = create_svg_icon(SVG_EYE)
+        self.icon_eye_off = create_svg_icon(SVG_EYE_OFF)
 
         # Main Layout
         central_widget = QWidget()
@@ -316,10 +349,25 @@ class RcloneConfiguratorApp(QMainWindow):
         grid_oauth.addWidget(self.txt_client_id, 0, 1)
 
         grid_oauth.addWidget(QLabel("Client Secret:"), 1, 0)
+        secret_layout = QHBoxLayout()
+        secret_layout.setContentsMargins(0, 0, 0, 0)
+        secret_layout.setSpacing(6)
         self.txt_client_secret = QLineEdit()
         self.txt_client_secret.setPlaceholderText("Enter Client Secret")
         self.txt_client_secret.setEchoMode(QLineEdit.Password)
-        grid_oauth.addWidget(self.txt_client_secret, 1, 1)
+        self.btn_toggle_client_secret = QPushButton()
+        self.btn_toggle_client_secret.setIcon(self.icon_eye)
+        self.btn_toggle_client_secret.setIconSize(QSize(18, 18))
+        self.btn_toggle_client_secret.setObjectName("SecondaryButton")
+        self.btn_toggle_client_secret.setFixedWidth(38)
+        self.btn_toggle_client_secret.setToolTip("Show/Hide Client Secret")
+        self.btn_toggle_client_secret.setCheckable(True)
+        self.btn_toggle_client_secret.toggled.connect(
+            lambda checked: self.toggle_password_visibility(self.txt_client_secret, self.btn_toggle_client_secret, checked)
+        )
+        secret_layout.addWidget(self.txt_client_secret)
+        secret_layout.addWidget(self.btn_toggle_client_secret)
+        grid_oauth.addLayout(secret_layout, 1, 1)
 
         lbl_tip = QLabel("Supports both 'Desktop App' (Recommended) & 'Web Application' credentials. See Guide tab for details.")
         lbl_tip.setObjectName("HelpTip")
@@ -358,7 +406,7 @@ class RcloneConfiguratorApp(QMainWindow):
         grid_drive = QGridLayout(grp_drive)
 
         grid_drive.addWidget(QLabel("Site Name:"), 0, 0)
-        self.txt_site_name = QLineEdit("GoIndex Extended by Cheems")
+        self.txt_site_name = QLineEdit("goindex by dilharamms")
         grid_drive.addWidget(self.txt_site_name, 0, 1)
 
         grid_drive.addWidget(QLabel("Drive ID:"), 0, 2)
@@ -374,9 +422,24 @@ class RcloneConfiguratorApp(QMainWindow):
         grid_drive.addWidget(self.txt_username, 1, 3)
 
         grid_drive.addWidget(QLabel("Password (Optional):"), 2, 0)
+        pass_layout = QHBoxLayout()
+        pass_layout.setContentsMargins(0, 0, 0, 0)
+        pass_layout.setSpacing(6)
         self.txt_password = QLineEdit("")
         self.txt_password.setEchoMode(QLineEdit.Password)
-        grid_drive.addWidget(self.txt_password, 2, 1)
+        self.btn_toggle_password = QPushButton()
+        self.btn_toggle_password.setIcon(self.icon_eye)
+        self.btn_toggle_password.setIconSize(QSize(18, 18))
+        self.btn_toggle_password.setObjectName("SecondaryButton")
+        self.btn_toggle_password.setFixedWidth(38)
+        self.btn_toggle_password.setToolTip("Show/Hide Password")
+        self.btn_toggle_password.setCheckable(True)
+        self.btn_toggle_password.toggled.connect(
+            lambda checked: self.toggle_password_visibility(self.txt_password, self.btn_toggle_password, checked)
+        )
+        pass_layout.addWidget(self.txt_password)
+        pass_layout.addWidget(self.btn_toggle_password)
+        grid_drive.addLayout(pass_layout, 2, 1)
 
         # --- GROUP 4: THEME & APPEARANCE ---
         grp_theme = QGroupBox("4. Theme & Appearance Settings")
@@ -640,11 +703,14 @@ class RcloneConfiguratorApp(QMainWindow):
             if "win" in system:
                 subprocess.run(["taskkill", "/F", "/IM", "rclone.exe"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
             else:
-                subprocess.run(["pkill", "-f", "rclone"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                subprocess.run(["pkill", "-9", "-f", "rclone"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         except Exception:
             pass
 
     def closeEvent(self, event):
+        if hasattr(self, 'auth_worker') and self.auth_worker and self.auth_worker.isRunning():
+            self.auth_worker.stop()
+            self.auth_worker.wait(1000)
         self.kill_existing_rclone_processes()
         event.accept()
 
@@ -733,9 +799,7 @@ class RcloneConfiguratorApp(QMainWindow):
             self.txt_output.setText(f"Error:\n{err}\n\n{msg}")
             QMessageBox.critical(self, "Error 403: Access Denied", msg)
         elif "53682" in err or "bind" in err:
-            msg = "Port 53682 was in use by a previous Rclone process.\nLingering processes have been terminated automatically.\nPlease click 'Start OAuth Authorization' again."
-            self.txt_output.setText(f"Error:\n{err}\n\n{msg}")
-            QMessageBox.warning(self, "Port Conflict Resolved", msg)
+            self.txt_output.setText(f"Info: Port 53682 conflict resolved automatically. Lingering processes killed.")
         else:
             self.txt_output.setText(f"Error:\n{err}")
             QMessageBox.critical(self, "Authorization Error", f"Failed to authorize:\n{err}")
@@ -811,7 +875,7 @@ class RcloneConfiguratorApp(QMainWindow):
         client_id = self.txt_client_id.text().strip()
         client_secret = self.txt_client_secret.text().strip()
         refresh_token = self.txt_refresh_token.text().strip()
-        site_name = self.txt_site_name.text().strip() or "GoIndex Extended by Cheems"
+        site_name = self.txt_site_name.text().strip() or "goindex by dilharamms"
         drive_id = self.txt_drive_id.text().strip() or "root"
         drive_name = self.txt_drive_name.text().strip() or "My Drive"
         username = self.txt_username.text().strip()
@@ -856,9 +920,18 @@ class RcloneConfiguratorApp(QMainWindow):
         self.txt_index_code.setText(code)
         self.txt_output.append("GoIndex Cloudflare Worker code generated successfully!\n")
 
+    def toggle_password_visibility(self, line_edit, button, checked):
+        if checked:
+            line_edit.setEchoMode(QLineEdit.Normal)
+            button.setIcon(self.icon_eye_off)
+        else:
+            line_edit.setEchoMode(QLineEdit.Password)
+            button.setIcon(self.icon_eye)
+
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
     window = RcloneConfiguratorApp()
+    app.aboutToQuit.connect(window.kill_existing_rclone_processes)
     window.show()
     sys.exit(app.exec())
