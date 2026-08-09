@@ -504,6 +504,29 @@ class RcloneConfiguratorApp(QMainWindow):
 
         <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 15px 0;">
 
+        <h3 style="color: #dc2626;">CRITICAL: Fixing Error 403: access_denied / Verification Error</h3>
+        <p>If you get <i>"Access blocked: [App Name] has not completed the Google verification process / Error 403: access_denied"</i>, your Google OAuth project is in <b>Testing</b> mode and your Google account is not added as a test user.</p>
+        <p><b>How to Fix (Choose Option 1 or Option 2):</b></p>
+        <ol>
+            <li><b>OPTION 1: Add your Email to "Test Users" (Recommended - Instant)</b>
+                <ul>
+                    <li>Go to <a style="color: #2563eb; font-weight: bold;" href="https://console.cloud.google.com/apis/credentials/consent">Google Cloud Console &rarr; OAuth consent screen</a>.</li>
+                    <li>Scroll down to the <b>Test users</b> section.</li>
+                    <li>Click <b>+ ADD USERS</b>, enter your Google account email, and click <b>SAVE</b>.</li>
+                    <li>Return here and click <b>Start OAuth Authorization</b> again.</li>
+                </ul>
+            </li>
+            <li style="margin-top: 8px;"><b>OPTION 2: Publish the App to Production</b>
+                <ul>
+                    <li>Go to <a style="color: #2563eb; font-weight: bold;" href="https://console.cloud.google.com/apis/credentials/consent">Google Cloud Console &rarr; OAuth consent screen</a>.</li>
+                    <li>Under <b>Publishing status</b>, click <b>PUBLISH APP</b>.</li>
+                    <li>During login, if Google shows a warning, click <b>Advanced</b> &rarr; <b>Go to App (unsafe)</b> to proceed.</li>
+                </ul>
+            </li>
+        </ol>
+
+        <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 15px 0;">
+
         <h3 style="color: #2563eb;">METHOD 1: Desktop Application Credentials (Recommended - Zero Configuration)</h3>
         <p><i>Desktop credentials automatically allow local loopback authorization (<code>http://127.0.0.1:53682/</code>) without needing any manual redirect URIs configured.</i></p>
         <ol>
@@ -692,6 +715,23 @@ class RcloneConfiguratorApp(QMainWindow):
             )
             self.txt_output.setText(f"Error:\n{err}\n\n{msg}")
             QMessageBox.critical(self, "Redirect URI Mismatch Error", msg)
+        elif "access_denied" in err or "403" in err or "verification" in err.lower():
+            msg = (
+                "Google OAuth Error: Error 403: access_denied\n"
+                "Access blocked: App has not completed the Google verification process.\n\n"
+                "HOW TO FIX THIS IN GOOGLE CLOUD CONSOLE:\n\n"
+                "OPTION 1: Add your email to 'Test users' (Recommended & Instant)\n"
+                "1. Open https://console.cloud.google.com/apis/credentials/consent\n"
+                "2. Scroll down to the 'Test users' section.\n"
+                "3. Click '+ ADD USERS' and enter your email address (e.g. shashikadilhara29@gmail.com).\n"
+                "4. Click 'SAVE' and click 'Start OAuth Authorization' again.\n\n"
+                "OPTION 2: Publish your App\n"
+                "1. Open https://console.cloud.google.com/apis/credentials/consent\n"
+                "2. Under 'Publishing status', click 'PUBLISH APP'.\n"
+                "3. Confirm, wait 60s, and retry authorization."
+            )
+            self.txt_output.setText(f"Error:\n{err}\n\n{msg}")
+            QMessageBox.critical(self, "Error 403: Access Denied", msg)
         elif "53682" in err or "bind" in err:
             msg = "Port 53682 was in use by a previous Rclone process.\nLingering processes have been terminated automatically.\nPlease click 'Start OAuth Authorization' again."
             self.txt_output.setText(f"Error:\n{err}\n\n{msg}")
