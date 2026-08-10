@@ -199,16 +199,17 @@ class DownloadWorker(QThread):
             system = platform.system().lower()
             if "win" in system:
                 url = "https://downloads.rclone.org/rclone-current-windows-amd64.zip"
-                zip_path = "rclone.zip"
                 exe_name = "rclone.exe"
             elif "darwin" in system:
                 url = "https://downloads.rclone.org/rclone-current-osx-amd64.zip"
-                zip_path = "rclone.zip"
                 exe_name = "rclone"
             else:
                 url = "https://downloads.rclone.org/rclone-current-linux-amd64.zip"
-                zip_path = "rclone.zip"
                 exe_name = "rclone"
+
+            rclone_dir = os.path.abspath("rclone")
+            os.makedirs(rclone_dir, exist_ok=True)
+            zip_path = os.path.join(rclone_dir, "rclone.zip")
 
             def report_hook(block_num, block_size, total_size):
                 if total_size > 0:
@@ -217,21 +218,22 @@ class DownloadWorker(QThread):
 
             urllib.request.urlretrieve(url, zip_path, reporthook=report_hook)
 
+            final_exe = os.path.join(rclone_dir, exe_name)
             with zipfile.ZipFile(zip_path, 'r') as zip_ref:
                 for file in zip_ref.namelist():
                     if file.endswith(exe_name):
-                        zip_ref.extract(file, ".")
-                        extracted_exe = os.path.join(".", file)
-                        final_exe = os.path.join(".", exe_name)
-                        if os.path.exists(final_exe):
+                        zip_ref.extract(file, rclone_dir)
+                        extracted_exe = os.path.join(rclone_dir, file)
+                        if os.path.exists(final_exe) and os.path.abspath(extracted_exe) != os.path.abspath(final_exe):
                             os.remove(final_exe)
-                        os.rename(extracted_exe, final_exe)
+                        if os.path.abspath(extracted_exe) != os.path.abspath(final_exe):
+                            os.rename(extracted_exe, final_exe)
                         break
 
             if os.path.exists(zip_path):
                 os.remove(zip_path)
 
-            self.finished.emit(os.path.abspath(exe_name))
+            self.finished.emit(os.path.abspath(final_exe))
         except Exception as e:
             self.error.emit(str(e))
 
@@ -283,7 +285,8 @@ class RcloneConfiguratorApp(QMainWindow):
         self.resize(960, 740)
         self.setStyleSheet(MODERN_STYLE)
 
-        self.rclone_bin = "rclone.exe" if platform.system().lower() == "windows" else "rclone"
+        rclone_exe_name = "rclone.exe" if platform.system().lower() == "windows" else "rclone"
+        self.rclone_bin = os.path.abspath(os.path.join(".", "rclone", rclone_exe_name))
 
         self.icon_eye = create_svg_icon(SVG_EYE)
         self.icon_eye_off = create_svg_icon(SVG_EYE_OFF)
@@ -647,17 +650,22 @@ class RcloneConfiguratorApp(QMainWindow):
     def find_rclone(self):
         rclone_name = "rclone.exe" if platform.system().lower() == "windows" else "rclone"
         
-        # 1. Check parent folder first
-        parent_path = os.path.abspath(os.path.join("..", rclone_name))
-        if os.path.exists(parent_path):
-            return parent_path
+        # 1. Check ./rclone/ subfolder first
+        subfolder_path = os.path.abspath(os.path.join(".", "rclone", rclone_name))
+        if os.path.exists(subfolder_path):
+            return subfolder_path
 
-        # 2. Check current folder
+        # 2. Check current root folder
         current_path = os.path.abspath(os.path.join(".", rclone_name))
         if os.path.exists(current_path):
             return current_path
 
-        # 3. Check system PATH
+        # 3. Check parent folder
+        parent_path = os.path.abspath(os.path.join("..", rclone_name))
+        if os.path.exists(parent_path):
+            return parent_path
+
+        # 4. Check system PATH
         from shutil import which
         path_in_env = which(rclone_name)
         if path_in_env:
