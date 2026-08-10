@@ -8,7 +8,7 @@ import urllib.request
 import subprocess
 from PySide6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
-    QLabel, QLineEdit, QPushButton, QTextEdit, QStackedWidget,
+    QLabel, QLineEdit, QPushButton, QTextEdit, QTextBrowser, QStackedWidget,
     QListWidget, QFrame, QMessageBox, QProgressBar, QComboBox,
     QCheckBox, QScrollArea, QFileDialog, QGroupBox, QGridLayout
 )
@@ -279,7 +279,7 @@ class AuthWorker(QThread):
 class RcloneConfiguratorApp(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("GoIndex Extended Worker Code Generator")
+        self.setWindowTitle("GOIndex Easy Deploy")
         self.resize(960, 740)
         self.setStyleSheet(MODERN_STYLE)
 
@@ -325,7 +325,7 @@ class RcloneConfiguratorApp(QMainWindow):
         layout.setContentsMargins(25, 25, 25, 25)
         layout.setSpacing(14)
 
-        header = QLabel("GoIndex Worker Code Generator")
+        header = QLabel("GOIndex Easy Deploy")
         header.setObjectName("HeaderLabel")
         subheader = QLabel("Perform local OAuth authorization, extract refresh token, and generate Cloudflare Worker code.")
         subheader.setObjectName("SubHeaderLabel")
@@ -481,7 +481,7 @@ class RcloneConfiguratorApp(QMainWindow):
         grid_theme.addWidget(self.chk_hide_actions, 2, 2, 1, 2)
 
         # Generate Button
-        self.btn_generate = QPushButton("Generate GoIndex Worker Code")
+        self.btn_generate = QPushButton("Generate GOIndex Worker Code")
         self.btn_generate.setObjectName("SuccessButton")
         self.btn_generate.clicked.connect(self.generate_worker_code)
 
@@ -505,7 +505,7 @@ class RcloneConfiguratorApp(QMainWindow):
         self.txt_index_code = QTextEdit()
         self.txt_index_code.setReadOnly(True)
         self.txt_index_code.setMinimumHeight(240)
-        self.txt_index_code.setPlaceholderText("Generated worker code will appear here after authorization or clicking 'Generate GoIndex Worker Code'...")
+        self.txt_index_code.setPlaceholderText("Generated worker code will appear here after authorization or clicking 'Generate GOIndex Worker Code'...")
 
         layout_output_box.addLayout(action_bar)
         layout_output_box.addWidget(self.txt_index_code)
@@ -547,10 +547,11 @@ class RcloneConfiguratorApp(QMainWindow):
         header = QLabel("Google OAuth & Worker Deployment Guide")
         header.setObjectName("HeaderLabel")
 
-        guide_text = QTextEdit()
+        guide_text = QTextBrowser()
+        guide_text.setOpenExternalLinks(True)
         guide_text.setReadOnly(True)
         guide_text.setStyleSheet("""
-            QTextEdit {
+            QTextBrowser {
                 background-color: #ffffff;
                 color: #334155;
                 font-family: 'Segoe UI', sans-serif;
