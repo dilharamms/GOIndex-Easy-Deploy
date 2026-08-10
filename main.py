@@ -1,6 +1,7 @@
 import sys
 import os
 import json
+import re
 import zipfile
 import platform
 import urllib.request
@@ -740,83 +741,105 @@ class RcloneConfiguratorApp(QMainWindow):
         self.auth_worker.error.connect(self.on_auth_error)
         self.auth_worker.start()
 
+    def parse_token_from_text(self, text):
+        if not text:
+            return "", "empty"
+        text = text.strip()
+
+        # 1. Look for explicit refresh token starting with 1//
+        match_goog = re.search(r'1//[a-zA-Z0-9_\-]+', text)
+        if match_goog:
+            return match_goog.group(0).strip(), "refresh_token"
+
+        # 2. Look for JSON refresh_token key
+        if "{" in text and "}" in text:
+            try:
+                start = text.find("{")
+                end = text.rfind("}") + 1
+                json_str = text[start:end]
+                data = json.loads(json_str)
+                if isinstance(data, dict):
+                    ref_tok = str(data.get("refresh_token") or "").strip()
+                    if ref_tok:
+                        if ref_tok.startswith("ya29."):
+                            return "", "access_token_only"
+                        return ref_tok, "refresh_token"
+
+                    acc_tok = str(data.get("access_token") or "").strip()
+                    if acc_tok:
+                        return "", "access_token_only"
+            except Exception:
+                pass
+
+        # 3. Check regex for "refresh_token":"..."
+        match_ref = re.search(r'"refresh_token"\s*:\s*"([^"]+)"', text)
+        if match_ref:
+            val = match_ref.group(1).strip()
+            if val.startswith("ya29."):
+                return "", "access_token_only"
+            return val, "refresh_token"
+
+        # 4. Check if output contains access_token (ya29...) without refresh_token
+        if "access_token" in text or "ya29." in text:
+            return "", "access_token_only"
+
+        # 5. Check if text is a single line without spaces
+        lines = [line.strip() for line in text.splitlines() if line.strip()]
+        if len(lines) == 1 and " " not in lines[0]:
+            if lines[0].startswith("ya29."):
+                return "", "access_token_only"
+            return lines[0], "refresh_token"
+
+        return "", "unknown"
+
     def on_auth_finished(self, output):
         self.btn_authorize.setEnabled(True)
         self.txt_output.setText(output)
 
-        extracted_token = ""
-        try:
-            if "{" in output and "}" in output:
-                json_str = output[output.find("{"):output.rfind("}")+1]
-                data = json.loads(json_str)
-                extracted_token = data.get("refresh_token", "")
-        except Exception:
-            pass
+        extracted_token, token_type = self.parse_token_from_text(output)
 
-        if extracted_token:
+        if token_type == "refresh_token" and extracted_token:
             self.txt_refresh_token.setText(extracted_token)
             self.txt_output.append(f"\n--- EXTRACTED REFRESH TOKEN ---\n{extracted_token}\n")
             self.generate_worker_code()
             QMessageBox.information(self, "Success", "Authorization completed successfully!\nRefresh Token extracted and Worker Code generated.")
+        elif token_type == "access_token_only":
+            msg = (
+                "CRITICAL WARNING: Google returned a temporary Access Token (ya29...) instead of a Refresh Token (1//...).\n\n"
+                "Why this happens:\n"
+                "Google only issues a true Refresh Token on the FIRST time you authorize an app.\n"
+                "Because your account already authorized this Client ID before, Google sent a short-lived 1-hour Access Token (ya29...), which causes Cloudflare Worker to hang ('green loading line')!\n\n"
+                "HOW TO FIX AND GET A REFRESH TOKEN (Choose Option 1 or Option 2):\n\n"
+                "OPTION 1: Revoke App Access in Google Account (Instant & Recommended)\n"
+                "1. Open https://myaccount.google.com/permissions in your browser.\n"
+                "2. Find your app name and click 'Delete all connections' / 'Remove Access'.\n"
+                "3. Return here and click 'Start OAuth Authorization' again.\n"
+                "   Google will prompt for permissions again and issue a true Refresh Token (starts with 1//)!\n\n"
+                "OPTION 2: Create a fresh OAuth Client ID\n"
+                "1. Go to Google Cloud Console -> Credentials.\n"
+                "2. Create a new OAuth Client ID (Desktop App).\n"
+                "3. Paste the new Client ID & Secret into Section 1 and re-authorize."
+            )
+            self.txt_output.append(f"\n--- ATTENTION REQUIRED ---\n{msg}\n")
+            QMessageBox.warning(self, "Temporary Access Token Received (ya29...)", msg)
         else:
-            QMessageBox.warning(self, "Auth Output", "Authorization completed, but refresh_token could not be parsed automatically. If output contains a token, copy it into the Refresh Token field manually.")
+            QMessageBox.warning(self, "Auth Output", "Authorization completed, but refresh_token could not be parsed automatically. If output contains a token starting with 1//, copy it into the Refresh Token field manually.")
 
     def on_auth_error(self, err):
         self.btn_authorize.setEnabled(True)
-        self.kill_existing_rclone_processes()
-        if "redirect_uri_mismatch" in err:
-            msg = (
-                "Google OAuth Error: Error 400: redirect_uri_mismatch\n\n"
-                "HOW TO FIX THIS IN GOOGLE CLOUD CONSOLE:\n\n"
-                "METHOD 1 (Recommended):\n"
-                "1. Go to Google Cloud Console -> Credentials.\n"
-                "2. Click '+ CREATE CREDENTIALS' -> 'OAuth client ID'.\n"
-                "3. Select Application type: 'Desktop app' (NOT Web application).\n"
-                "4. Copy the new Client ID & Client Secret into this app.\n\n"
-                "METHOD 2 (If using 'Web application'):\n"
-                "1. In Credentials, edit your OAuth Client ID.\n"
-                "2. Under 'Authorized redirect URIs', click '+ ADD URI'.\n"
-                "3. Add: http://127.0.0.1:53682/\n"
-                "4. Save changes, wait 60s, and try authorization again."
-            )
-            self.txt_output.setText(f"Error:\n{err}\n\n{msg}")
-            QMessageBox.critical(self, "Redirect URI Mismatch Error", msg)
-        elif "access_denied" in err or "403" in err or "verification" in err.lower():
-            msg = (
-                "Google OAuth Error: Error 403: access_denied\n"
-                "Access blocked: App has not completed the Google verification process.\n\n"
-                "HOW TO FIX THIS IN GOOGLE CLOUD CONSOLE:\n\n"
-                "OPTION 1: Add your email to 'Test users' (Recommended & Instant)\n"
-                "1. Open https://console.cloud.google.com/apis/credentials/consent\n"
-                "2. Scroll down to the 'Test users' section.\n"
-                "3. Click '+ ADD USERS' and enter your email address (e.g. shashikadilhara29@gmail.com).\n"
-                "4. Click 'SAVE' and click 'Start OAuth Authorization' again.\n\n"
-                "OPTION 2: Publish your App\n"
-                "1. Open https://console.cloud.google.com/apis/credentials/consent\n"
-                "2. Under 'Publishing status', click 'PUBLISH APP'.\n"
-                "3. Confirm, wait 60s, and retry authorization."
-            )
-            self.txt_output.setText(f"Error:\n{err}\n\n{msg}")
-            QMessageBox.critical(self, "Error 403: Access Denied", msg)
-        elif "53682" in err or "bind" in err:
-            self.txt_output.setText(f"Info: Port 53682 conflict resolved automatically. Lingering processes killed.")
-        else:
-            self.txt_output.setText(f"Error:\n{err}")
-            QMessageBox.critical(self, "Authorization Error", f"Failed to authorize:\n{err}")
+        self.txt_output.append(f"\n--- AUTHORIZATION ERROR ---\n{err}\n")
+        QMessageBox.critical(self, "Authorization Error", f"OAuth authorization failed:\n{err}")
 
     def on_token_text_changed(self, text):
         text = text.strip()
-        if text.startswith("{") and text.endswith("}"):
-            try:
-                data = json.loads(text)
-                ref_tok = data.get("refresh_token", "")
-                if ref_tok:
-                    self.txt_refresh_token.blockSignals(True)
-                    self.txt_refresh_token.setText(ref_tok)
-                    self.txt_refresh_token.blockSignals(False)
-                    self.txt_output.append(f"Parsed refresh_token from JSON: {ref_tok}\n")
-            except Exception:
-                pass
+        if "{" in text or '"access_token"' in text or '"refresh_token"' in text or text.startswith("Got code"):
+            parsed_tok, token_type = self.parse_token_from_text(text)
+            if token_type == "refresh_token" and parsed_tok and parsed_tok != text:
+                self.txt_refresh_token.blockSignals(True)
+                self.txt_refresh_token.setText(parsed_tok)
+                self.txt_refresh_token.blockSignals(False)
+                self.txt_output.append(f"Parsed refresh token from input: {parsed_tok}\n")
+                self.generate_worker_code()
 
     def copy_refresh_token(self):
         token = self.txt_refresh_token.text().strip()
