@@ -11,6 +11,16 @@ It solves the issue caused by Google's deprecation of the Out-Of-Band (OOB) OAut
 
 ---
 
+## 📺 Video Tutorial
+
+Watch the complete step-by-step setup and deployment guide:
+
+[![GOIndex Easy Deploy Tutorial](https://img.youtube.com/vi/NpymIG6Zm-w/0.jpg)](https://www.youtube.com/watch?v=NpymIG6Zm-w)
+
+▶️ **[Watch the Video Tutorial on YouTube](https://www.youtube.com/watch?v=NpymIG6Zm-w)**
+
+---
+
 ## 🌟 Key Features
 
 - 🔐 **Automated Local OAuth Authorization**: Runs a local loopback web server via Rclone to safely sign into Google Drive and capture your `refresh_token`.
