@@ -27,39 +27,6 @@ def find_logo_file():
             return parent_cand
     return None
 
-def get_logo_data_uri(logo_path, size=96):
-    fallback_url = "https://raw.githubusercontent.com/dilharamms/GOIndex-Easy-Deploy/refs/heads/main/logo.png"
-    if not logo_path or not os.path.exists(logo_path):
-        return fallback_url
-    try:
-        pixmap = QPixmap(logo_path)
-        if pixmap.isNull():
-            return fallback_url
-        scaled_pixmap = pixmap.scaled(size, size, Qt.KeepAspectRatio, Qt.SmoothTransformation)
-        ba = QByteArray()
-        buffer = QBuffer(ba)
-        buffer.open(QIODevice.WriteOnly)
-        scaled_pixmap.save(buffer, "PNG")
-        b64_str = ba.toBase64().data().decode("utf-8")
-        return f"data:image/png;base64,{b64_str}"
-    except Exception:
-        return fallback_url
-
-def parse_github_url(url_str):
-    url_str = (url_str or "").strip()
-    if not url_str:
-        return "https://github.com/dilharamms/GOIndex-Easy-Deploy", "dilharamms", "GOIndex-Easy-Deploy"
-    clean_path = url_str.replace("https://github.com/", "").replace("http://github.com/", "").strip("/")
-    parts = clean_path.split("/")
-    if len(parts) >= 2:
-        owner = parts[0]
-        name = parts[1]
-        full_url = f"https://github.com/{owner}/{name}"
-        return full_url, owner, name
-    elif len(parts) == 1 and parts[0]:
-        return f"https://github.com/{parts[0]}", parts[0], parts[0]
-    return "https://github.com/dilharamms/GOIndex-Easy-Deploy", "dilharamms", "GOIndex-Easy-Deploy"
-
 # --- SVG ICONS ---
 SVG_EYE = """<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#475569" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
   <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
@@ -330,7 +297,6 @@ class RcloneConfiguratorApp(QMainWindow):
         self.setStyleSheet(MODERN_STYLE)
 
         self.logo_path = find_logo_file()
-        self.default_site_icon = get_logo_data_uri(self.logo_path)
 
         if self.logo_path:
             app_icon = QIcon(self.logo_path)
@@ -547,18 +513,8 @@ class RcloneConfiguratorApp(QMainWindow):
         self.txt_help_url = QLineEdit("")
         grid_theme.addWidget(self.txt_help_url, 2, 1)
 
-        grid_theme.addWidget(QLabel("Favicon / Icon URL:"), 2, 2)
-        self.txt_site_icon = QLineEdit(self.default_site_icon)
-        self.txt_site_icon.setToolTip("URL or base64 data URI for site favicon. Auto-generated from logo image if available.")
-        grid_theme.addWidget(self.txt_site_icon, 2, 3)
-
-        grid_theme.addWidget(QLabel("GitHub Repo URL:"), 3, 0)
-        self.txt_repo_url = QLineEdit("https://github.com/dilharamms/GOIndex-Easy-Deploy")
-        self.txt_repo_url.setToolTip("URL of your repository to display as a badge at the bottom of the GOIndex webpage.")
-        grid_theme.addWidget(self.txt_repo_url, 3, 1, 1, 3)
-
         self.chk_hide_actions = QCheckBox("Hide Actions Tab (Direct download/copy links)")
-        grid_theme.addWidget(self.chk_hide_actions, 4, 0, 1, 4)
+        grid_theme.addWidget(self.chk_hide_actions, 2, 2, 1, 2)
 
         # Generate Button
         self.btn_generate = QPushButton("Generate GOIndex Worker Code")
@@ -994,9 +950,10 @@ class RcloneConfiguratorApp(QMainWindow):
         client_secret = self.txt_client_secret.text().strip()
         refresh_token = self.txt_refresh_token.text().strip()
         site_name = self.txt_site_name.text().strip() or "goindex by dilharamms"
-        site_icon = self.txt_site_icon.text().strip() or self.default_site_icon
-        repo_url_input = self.txt_repo_url.text().strip()
-        repo_url, repo_owner, repo_name = parse_github_url(repo_url_input)
+        site_icon = "https://raw.githubusercontent.com/dilharamms/GOIndex-Easy-Deploy/refs/heads/main/logo.png"
+        repo_url = "https://github.com/dilharamms/GOIndex-Easy-Deploy"
+        repo_owner = "dilharamms"
+        repo_name = "GOIndex-Easy-Deploy"
         drive_id = self.txt_drive_id.text().strip() or "root"
         drive_name = self.txt_drive_name.text().strip() or "My Drive"
         username = self.txt_username.text().strip()
