@@ -1,0 +1,48 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Distribution / packaging
+build/
+dist/
+*.egg-info/
+.eggs/
+
+# Virtual Environments
+venv/
+.venv/
+env/
+
+# Rclone downloaded binaries & archives
+rclone/rclone.exe
+rclone/rclone
+rclone/rclone.zip
+rclone/*.zip
+rclone/*.1
+rclone/*.txt
+rclone/*.html
+
+# Generated Worker Output Files
+index.js
+
+# Log & Temp files
+*.log
+git-log.txt
+git-log*
+git_log*
+*git-log*
+*.tmp
+*.temp
+
+# OS generated files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# IDE & Editor Settings
+.idea/
+.vscode/
+*.swp
+*.swo
