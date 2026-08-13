@@ -16,13 +16,7 @@ venv/
 env/
 
 # Rclone downloaded binaries & archives
-rclone/rclone.exe
-rclone/rclone
-rclone/rclone.zip
-rclone/*.zip
-rclone/*.1
-rclone/*.txt
-rclone/*.html
+rclone/
 
 # Generated Worker Output Files
 index.js
