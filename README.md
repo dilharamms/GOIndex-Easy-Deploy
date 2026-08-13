@@ -139,9 +139,9 @@ GOIndex-Easy-Deploy/
 
 ## 🙏 Credits & Acknowledgments
 
-- **GOIndex / GOIndex Extended**: Developed by [Cheems](https://github.com/cheems/goindex-extended) and original GOIndex authors.
+- **GOIndex / GOIndex Extended**: Developed by [menukaonline](https://github.com/menukaonline/goindex-extended) and original GOIndex authors.
 - **Rclone**: The versatile cloud storage tool created by [Nick Craig-Wood](https://rclone.org/).
-- **PySide6**: Official Python bindings for Qt.
+
 
 ---
 
