@@ -18,7 +18,7 @@ from PySide6.QtGui import QFont, QIcon, QPixmap, QPainter
 from PySide6.QtSvg import QSvgRenderer
 
 def find_logo_file():
-    candidates = ["go index logo.png", "logo.png", "logo.ico", "favicon.png"]
+    candidates = ["logo.png", "go index logo.png", "logo.ico", "favicon.png"]
     for cand in candidates:
         if os.path.exists(cand):
             return os.path.abspath(cand)
@@ -335,45 +335,19 @@ class RcloneConfiguratorApp(QMainWindow):
         main_layout.setContentsMargins(0, 0, 0, 0)
         main_layout.setSpacing(0)
 
-        # Sidebar Container Layout with Logo Header Card
-        sidebar_panel = QWidget()
-        sidebar_panel.setFixedWidth(220)
-        sidebar_panel.setStyleSheet("background-color: #ffffff; border-right: 1px solid #e2e8f0;")
-        sidebar_panel_layout = QVBoxLayout(sidebar_panel)
-        sidebar_panel_layout.setContentsMargins(0, 0, 0, 0)
-        sidebar_panel_layout.setSpacing(0)
-
-        if self.logo_path:
-            logo_card = QWidget()
-            logo_card.setStyleSheet("background-color: #ffffff; border-bottom: 1px solid #e2e8f0; padding: 12px;")
-            logo_card_layout = QHBoxLayout(logo_card)
-            logo_card_layout.setContentsMargins(12, 16, 12, 16)
-            logo_card_layout.setSpacing(10)
-
-            lbl_logo_img = QLabel()
-            lbl_logo_img.setPixmap(QPixmap(self.logo_path).scaled(42, 42, Qt.KeepAspectRatio, Qt.SmoothTransformation))
-            lbl_logo_title = QLabel("GOIndex\nEasy Deploy")
-            lbl_logo_title.setStyleSheet("font-weight: bold; font-size: 14px; color: #0f172a; border: none;")
-
-            logo_card_layout.addWidget(lbl_logo_img)
-            logo_card_layout.addWidget(lbl_logo_title)
-            logo_card_layout.addStretch()
-            sidebar_panel_layout.addWidget(logo_card)
-
         # Sidebar Navigation
         self.sidebar = QListWidget()
+        self.sidebar.setFixedWidth(200)
         self.sidebar.addItem("Setup & Generator")
         self.sidebar.addItem("Guide & Instructions")
         self.sidebar.currentRowChanged.connect(self.switch_page)
-
-        sidebar_panel_layout.addWidget(self.sidebar)
 
         # Stacked Pages
         self.pages = QStackedWidget()
         self.pages.addWidget(self.create_config_page())
         self.pages.addWidget(self.create_guide_page())
 
-        main_layout.addWidget(sidebar_panel)
+        main_layout.addWidget(self.sidebar)
         main_layout.addWidget(self.pages)
 
         self.sidebar.setCurrentRow(0)
@@ -392,12 +366,12 @@ class RcloneConfiguratorApp(QMainWindow):
         layout.setSpacing(14)
 
         header_layout = QHBoxLayout()
-        header_layout.setSpacing(14)
+        header_layout.setSpacing(16)
 
         if self.logo_path:
             lbl_hdr_logo = QLabel()
-            lbl_hdr_logo.setPixmap(QPixmap(self.logo_path).scaled(54, 54, Qt.KeepAspectRatio, Qt.SmoothTransformation))
-            header_layout.addWidget(lbl_hdr_logo)
+            lbl_hdr_logo.setPixmap(QPixmap(self.logo_path).scaled(80, 80, Qt.KeepAspectRatio, Qt.SmoothTransformation))
+            header_layout.addWidget(lbl_hdr_logo, 0, Qt.AlignVCenter)
 
         header_text_box = QVBoxLayout()
         header = QLabel("GOIndex Easy Deploy")
@@ -629,12 +603,12 @@ class RcloneConfiguratorApp(QMainWindow):
         layout.setContentsMargins(25, 25, 25, 25)
 
         guide_hdr_layout = QHBoxLayout()
-        guide_hdr_layout.setSpacing(14)
+        guide_hdr_layout.setSpacing(16)
 
         if self.logo_path:
             lbl_guide_logo = QLabel()
-            lbl_guide_logo.setPixmap(QPixmap(self.logo_path).scaled(44, 44, Qt.KeepAspectRatio, Qt.SmoothTransformation))
-            guide_hdr_layout.addWidget(lbl_guide_logo)
+            lbl_guide_logo.setPixmap(QPixmap(self.logo_path).scaled(64, 64, Qt.KeepAspectRatio, Qt.SmoothTransformation))
+            guide_hdr_layout.addWidget(lbl_guide_logo, 0, Qt.AlignVCenter)
 
         header = QLabel("Google OAuth & Worker Deployment Guide")
         header.setObjectName("HeaderLabel")
