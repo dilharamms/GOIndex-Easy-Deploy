@@ -5,16 +5,44 @@ import re
 import zipfile
 import platform
 import urllib.request
-import subprocess
+import base64
+import ctypes
 from PySide6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QLabel, QLineEdit, QPushButton, QTextEdit, QTextBrowser, QStackedWidget,
     QListWidget, QFrame, QMessageBox, QProgressBar, QComboBox,
     QCheckBox, QScrollArea, QFileDialog, QGroupBox, QGridLayout
 )
-from PySide6.QtCore import Qt, QThread, Signal, QByteArray, QSize
+from PySide6.QtCore import Qt, QThread, Signal, QByteArray, QSize, QBuffer, QIODevice
 from PySide6.QtGui import QFont, QIcon, QPixmap, QPainter
 from PySide6.QtSvg import QSvgRenderer
+
+def find_logo_file():
+    candidates = ["go index logo.png", "logo.png", "logo.ico", "favicon.png"]
+    for cand in candidates:
+        if os.path.exists(cand):
+            return os.path.abspath(cand)
+        parent_cand = os.path.abspath(os.path.join(".", cand))
+        if os.path.exists(parent_cand):
+            return parent_cand
+    return None
+
+def get_logo_data_uri(logo_path, size=96):
+    if not logo_path or not os.path.exists(logo_path):
+        return "https://raw.githubusercontent.com/cheems/goindex-extended/master/images/favicon.png"
+    try:
+        pixmap = QPixmap(logo_path)
+        if pixmap.isNull():
+            return "https://raw.githubusercontent.com/cheems/goindex-extended/master/images/favicon.png"
+        scaled_pixmap = pixmap.scaled(size, size, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+        ba = QByteArray()
+        buffer = QBuffer(ba)
+        buffer.open(QIODevice.WriteOnly)
+        scaled_pixmap.save(buffer, "PNG")
+        b64_str = ba.toBase64().data().decode("utf-8")
+        return f"data:image/png;base64,{b64_str}"
+    except Exception:
+        return "https://raw.githubusercontent.com/cheems/goindex-extended/master/images/favicon.png"
 
 # --- SVG ICONS ---
 SVG_EYE = """<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#475569" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -282,8 +310,17 @@ class RcloneConfiguratorApp(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("GOIndex Easy Deploy")
-        self.resize(960, 740)
+        self.resize(980, 750)
         self.setStyleSheet(MODERN_STYLE)
+
+        self.logo_path = find_logo_file()
+        self.default_site_icon = get_logo_data_uri(self.logo_path)
+
+        if self.logo_path:
+            app_icon = QIcon(self.logo_path)
+            self.setWindowIcon(app_icon)
+            if QApplication.instance():
+                QApplication.instance().setWindowIcon(app_icon)
 
         rclone_exe_name = "rclone.exe" if platform.system().lower() == "windows" else "rclone"
         self.rclone_bin = os.path.abspath(os.path.join(".", "rclone", rclone_exe_name))
@@ -298,19 +335,45 @@ class RcloneConfiguratorApp(QMainWindow):
         main_layout.setContentsMargins(0, 0, 0, 0)
         main_layout.setSpacing(0)
 
+        # Sidebar Container Layout with Logo Header Card
+        sidebar_panel = QWidget()
+        sidebar_panel.setFixedWidth(220)
+        sidebar_panel.setStyleSheet("background-color: #ffffff; border-right: 1px solid #e2e8f0;")
+        sidebar_panel_layout = QVBoxLayout(sidebar_panel)
+        sidebar_panel_layout.setContentsMargins(0, 0, 0, 0)
+        sidebar_panel_layout.setSpacing(0)
+
+        if self.logo_path:
+            logo_card = QWidget()
+            logo_card.setStyleSheet("background-color: #ffffff; border-bottom: 1px solid #e2e8f0; padding: 12px;")
+            logo_card_layout = QHBoxLayout(logo_card)
+            logo_card_layout.setContentsMargins(12, 16, 12, 16)
+            logo_card_layout.setSpacing(10)
+
+            lbl_logo_img = QLabel()
+            lbl_logo_img.setPixmap(QPixmap(self.logo_path).scaled(42, 42, Qt.KeepAspectRatio, Qt.SmoothTransformation))
+            lbl_logo_title = QLabel("GOIndex\nEasy Deploy")
+            lbl_logo_title.setStyleSheet("font-weight: bold; font-size: 14px; color: #0f172a; border: none;")
+
+            logo_card_layout.addWidget(lbl_logo_img)
+            logo_card_layout.addWidget(lbl_logo_title)
+            logo_card_layout.addStretch()
+            sidebar_panel_layout.addWidget(logo_card)
+
         # Sidebar Navigation
         self.sidebar = QListWidget()
-        self.sidebar.setFixedWidth(200)
         self.sidebar.addItem("Setup & Generator")
         self.sidebar.addItem("Guide & Instructions")
         self.sidebar.currentRowChanged.connect(self.switch_page)
+
+        sidebar_panel_layout.addWidget(self.sidebar)
 
         # Stacked Pages
         self.pages = QStackedWidget()
         self.pages.addWidget(self.create_config_page())
         self.pages.addWidget(self.create_guide_page())
 
-        main_layout.addWidget(self.sidebar)
+        main_layout.addWidget(sidebar_panel)
         main_layout.addWidget(self.pages)
 
         self.sidebar.setCurrentRow(0)
@@ -328,10 +391,24 @@ class RcloneConfiguratorApp(QMainWindow):
         layout.setContentsMargins(25, 25, 25, 25)
         layout.setSpacing(14)
 
+        header_layout = QHBoxLayout()
+        header_layout.setSpacing(14)
+
+        if self.logo_path:
+            lbl_hdr_logo = QLabel()
+            lbl_hdr_logo.setPixmap(QPixmap(self.logo_path).scaled(54, 54, Qt.KeepAspectRatio, Qt.SmoothTransformation))
+            header_layout.addWidget(lbl_hdr_logo)
+
+        header_text_box = QVBoxLayout()
         header = QLabel("GOIndex Easy Deploy")
         header.setObjectName("HeaderLabel")
         subheader = QLabel("Perform local OAuth authorization, extract refresh token, and generate Cloudflare Worker code.")
         subheader.setObjectName("SubHeaderLabel")
+        header_text_box.addWidget(header)
+        header_text_box.addWidget(subheader)
+
+        header_layout.addLayout(header_text_box)
+        header_layout.addStretch()
 
         # Rclone Status
         rclone_layout = QHBoxLayout()
@@ -480,8 +557,13 @@ class RcloneConfiguratorApp(QMainWindow):
         self.txt_help_url = QLineEdit("")
         grid_theme.addWidget(self.txt_help_url, 2, 1)
 
+        grid_theme.addWidget(QLabel("Favicon / Icon URL:"), 2, 2)
+        self.txt_site_icon = QLineEdit(self.default_site_icon)
+        self.txt_site_icon.setToolTip("URL or base64 data URI for site favicon. Auto-generated from logo image if available.")
+        grid_theme.addWidget(self.txt_site_icon, 2, 3)
+
         self.chk_hide_actions = QCheckBox("Hide Actions Tab (Direct download/copy links)")
-        grid_theme.addWidget(self.chk_hide_actions, 2, 2, 1, 2)
+        grid_theme.addWidget(self.chk_hide_actions, 3, 0, 1, 4)
 
         # Generate Button
         self.btn_generate = QPushButton("Generate GOIndex Worker Code")
@@ -522,8 +604,7 @@ class RcloneConfiguratorApp(QMainWindow):
         self.txt_output.setPlaceholderText("Console logs will appear here...")
 
         # Assembly
-        layout.addWidget(header)
-        layout.addWidget(subheader)
+        layout.addLayout(header_layout)
         layout.addLayout(rclone_layout)
         layout.addWidget(self.progress_bar)
         layout.addWidget(grp_auth)
@@ -547,8 +628,18 @@ class RcloneConfiguratorApp(QMainWindow):
         layout = QVBoxLayout(page)
         layout.setContentsMargins(25, 25, 25, 25)
 
+        guide_hdr_layout = QHBoxLayout()
+        guide_hdr_layout.setSpacing(14)
+
+        if self.logo_path:
+            lbl_guide_logo = QLabel()
+            lbl_guide_logo.setPixmap(QPixmap(self.logo_path).scaled(44, 44, Qt.KeepAspectRatio, Qt.SmoothTransformation))
+            guide_hdr_layout.addWidget(lbl_guide_logo)
+
         header = QLabel("Google OAuth & Worker Deployment Guide")
         header.setObjectName("HeaderLabel")
+        guide_hdr_layout.addWidget(header)
+        guide_hdr_layout.addStretch()
 
         guide_text = QTextBrowser()
         guide_text.setOpenExternalLinks(True)
@@ -641,7 +732,7 @@ class RcloneConfiguratorApp(QMainWindow):
         """
         guide_text.setHtml(guide_content)
 
-        layout.addWidget(header)
+        layout.addLayout(guide_hdr_layout)
         layout.addWidget(guide_text)
 
         return page
@@ -908,6 +999,7 @@ class RcloneConfiguratorApp(QMainWindow):
         client_secret = self.txt_client_secret.text().strip()
         refresh_token = self.txt_refresh_token.text().strip()
         site_name = self.txt_site_name.text().strip() or "goindex by dilharamms"
+        site_icon = self.txt_site_icon.text().strip() or self.default_site_icon
         drive_id = self.txt_drive_id.text().strip() or "root"
         drive_name = self.txt_drive_name.text().strip() or "My Drive"
         username = self.txt_username.text().strip()
@@ -930,6 +1022,7 @@ class RcloneConfiguratorApp(QMainWindow):
 
         replacements = {
             "{cheems_site_name}": site_name,
+            "{cheems_site_icon}": site_icon,
             "{cheems_client_id}": client_id,
             "{cheems_client_secret}": client_secret,
             "{cheems_refresh_token}": refresh_token,
@@ -962,6 +1055,13 @@ class RcloneConfiguratorApp(QMainWindow):
 
 
 if __name__ == "__main__":
+    if platform.system().lower() == "windows":
+        try:
+            myappid = 'dilharamms.goindex.easydeploy.1.0'
+            ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(myappid)
+        except Exception:
+            pass
+
     app = QApplication(sys.argv)
     window = RcloneConfiguratorApp()
     app.aboutToQuit.connect(window.kill_existing_rclone_processes)
