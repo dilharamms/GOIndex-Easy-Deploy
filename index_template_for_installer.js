@@ -1,6 +1,9 @@
 const authConfig = {
   "siteName": "{cheems_site_name}", // WebSite Name
   "siteIcon": "{cheems_site_icon}", // WebSite Favicon / Icon
+  "repoUrl": "{cheems_repo_url}", // GitHub Repo URL
+  "repoOwner": "{cheems_repo_owner}", // GitHub Repo Owner
+  "repoName": "{cheems_repo_name}", // GitHub Repo Name
 // please use the index.js(https://git.io/Jzqx3) file in the root of the repo if you need the latest version
   "version": "1.15", // VersionControl, do not modify manually
 // client_id & client_secret - PLEASE USE YOUR OWN!
@@ -125,6 +128,34 @@ function html(current_drive_order = 0, model = {}) {
     window.UI = JSON.parse('${JSON.stringify(uiConfig)}');
   </script>
   <script src="https://rawcdn.githack.com/cheems/goindex-extended/81b644d0524f2f1079705ee381ad85ddb538982d/app.js"></script>
+  <script>
+    (function() {
+      function injectBadge() {
+        if (document.getElementById('custom-repo-badge')) return;
+        var footer = document.querySelector('.footer') || document.querySelector('footer') || document.body;
+        if (footer && authConfig.repoUrl) {
+          var container = document.createElement('div');
+          container.id = 'custom-repo-badge';
+          container.style.cssText = 'display:flex;justify-content:center;align-items:center;margin:12px 0 20px 0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;width:100%;';
+          container.innerHTML = '<a href="' + authConfig.repoUrl + '" target="_blank" rel="noopener noreferrer" style="display:inline-flex;align-items:center;text-decoration:none;font-size:13px;font-weight:600;border-radius:6px;overflow:hidden;box-shadow:0 2px 5px rgba(0,0,0,0.2);transition:transform 0.2s,box-shadow 0.2s;">' +
+            '<span style="background-color:#24292e;color:#ffffff;padding:5px 10px;display:flex;align-items:center;gap:6px;">' +
+              '<svg height="15" width="15" viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.28.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"></path></svg>' +
+              (authConfig.repoOwner || 'dilharamms') +
+            '</span>' +
+            '<span style="background-color:#2563eb;color:#ffffff;padding:5px 10px;">' +
+              (authConfig.repoName || 'GOIndex-Easy-Deploy') +
+            '</span>' +
+          '</a>';
+          footer.appendChild(container);
+        }
+      }
+      var observer = new MutationObserver(injectBadge);
+      observer.observe(document.documentElement, { childList: true, subtree: true });
+      window.addEventListener('DOMContentLoaded', injectBadge);
+      setTimeout(injectBadge, 1000);
+      setTimeout(injectBadge, 3000);
+    })();
+  </script>
 </head>
 <body>
 </body>

@@ -44,6 +44,21 @@ def get_logo_data_uri(logo_path, size=96):
     except Exception:
         return "https://raw.githubusercontent.com/cheems/goindex-extended/master/images/favicon.png"
 
+def parse_github_url(url_str):
+    url_str = (url_str or "").strip()
+    if not url_str:
+        return "https://github.com/dilharamms/GOIndex-Easy-Deploy", "dilharamms", "GOIndex-Easy-Deploy"
+    clean_path = url_str.replace("https://github.com/", "").replace("http://github.com/", "").strip("/")
+    parts = clean_path.split("/")
+    if len(parts) >= 2:
+        owner = parts[0]
+        name = parts[1]
+        full_url = f"https://github.com/{owner}/{name}"
+        return full_url, owner, name
+    elif len(parts) == 1 and parts[0]:
+        return f"https://github.com/{parts[0]}", parts[0], parts[0]
+    return "https://github.com/dilharamms/GOIndex-Easy-Deploy", "dilharamms", "GOIndex-Easy-Deploy"
+
 # --- SVG ICONS ---
 SVG_EYE = """<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#475569" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
   <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
@@ -536,8 +551,13 @@ class RcloneConfiguratorApp(QMainWindow):
         self.txt_site_icon.setToolTip("URL or base64 data URI for site favicon. Auto-generated from logo image if available.")
         grid_theme.addWidget(self.txt_site_icon, 2, 3)
 
+        grid_theme.addWidget(QLabel("GitHub Repo URL:"), 3, 0)
+        self.txt_repo_url = QLineEdit("https://github.com/dilharamms/GOIndex-Easy-Deploy")
+        self.txt_repo_url.setToolTip("URL of your repository to display as a badge at the bottom of the GOIndex webpage.")
+        grid_theme.addWidget(self.txt_repo_url, 3, 1, 1, 3)
+
         self.chk_hide_actions = QCheckBox("Hide Actions Tab (Direct download/copy links)")
-        grid_theme.addWidget(self.chk_hide_actions, 3, 0, 1, 4)
+        grid_theme.addWidget(self.chk_hide_actions, 4, 0, 1, 4)
 
         # Generate Button
         self.btn_generate = QPushButton("Generate GOIndex Worker Code")
@@ -974,6 +994,8 @@ class RcloneConfiguratorApp(QMainWindow):
         refresh_token = self.txt_refresh_token.text().strip()
         site_name = self.txt_site_name.text().strip() or "goindex by dilharamms"
         site_icon = self.txt_site_icon.text().strip() or self.default_site_icon
+        repo_url_input = self.txt_repo_url.text().strip()
+        repo_url, repo_owner, repo_name = parse_github_url(repo_url_input)
         drive_id = self.txt_drive_id.text().strip() or "root"
         drive_name = self.txt_drive_name.text().strip() or "My Drive"
         username = self.txt_username.text().strip()
@@ -997,6 +1019,9 @@ class RcloneConfiguratorApp(QMainWindow):
         replacements = {
             "{cheems_site_name}": site_name,
             "{cheems_site_icon}": site_icon,
+            "{cheems_repo_url}": repo_url,
+            "{cheems_repo_owner}": repo_owner,
+            "{cheems_repo_name}": repo_name,
             "{cheems_client_id}": client_id,
             "{cheems_client_secret}": client_secret,
             "{cheems_refresh_token}": refresh_token,
