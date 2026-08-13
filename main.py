@@ -369,8 +369,13 @@ class RcloneConfiguratorApp(QMainWindow):
         # Rclone Status
         rclone_layout = QHBoxLayout()
         self.lbl_rclone_status = QLabel("Checking Rclone binary...")
+        self.btn_manual_rclone = QPushButton("Manual Rclone Guide")
+        self.btn_manual_rclone.setObjectName("SecondaryButton")
+        self.btn_manual_rclone.clicked.connect(self.show_manual_rclone_guide)
+
         rclone_layout.addWidget(self.lbl_rclone_status)
         rclone_layout.addStretch()
+        rclone_layout.addWidget(self.btn_manual_rclone)
 
         self.progress_bar = QProgressBar()
         self.progress_bar.setVisible(False)
@@ -673,6 +678,23 @@ class RcloneConfiguratorApp(QMainWindow):
 
         <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 15px 0;">
 
+        <h3 style="color: #6366f1;">Manual Rclone Installation (Fallback / Offline Setup)</h3>
+        <p>If automatic Rclone download fails due to network restrictions, proxy, or firewall settings:</p>
+        <ol>
+            <li>Go to the official <a style="color: #2563eb; font-weight: bold;" href="https://rclone.org/downloads/">Rclone Downloads Page</a>.</li>
+            <li>Download the zip package for your operating system (e.g. <i>Windows 64-bit</i>).</li>
+            <li>Extract the downloaded zip file.</li>
+            <li>Copy <code>rclone.exe</code> (Windows) or <code>rclone</code> (macOS/Linux) directly into either:
+                <ul>
+                    <li>The root directory of <b>GOIndex Easy Deploy</b> (next to <code>main.py</code>).</li>
+                    <li>Or inside the <code>./rclone/</code> subfolder.</li>
+                </ul>
+            </li>
+            <li>The application will automatically detect it and display <b>Status: Rclone Ready</b>!</li>
+        </ol>
+
+        <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 15px 0;">
+
         <h3>Deploying to Cloudflare Workers:</h3>
         <ol>
             <li>Log into the <a style="color: #2563eb;" href="https://dash.cloudflare.com/">Cloudflare Dashboard</a> &rarr; <b>Workers & Pages</b>.</li>
@@ -736,6 +758,30 @@ class RcloneConfiguratorApp(QMainWindow):
         self.dl_worker.error.connect(self.on_download_error)
         self.dl_worker.start()
 
+    def show_manual_rclone_guide(self):
+        rclone_exe_name = "rclone.exe" if platform.system().lower() == "windows" else "rclone"
+        msg = (
+            "MANUAL RCLONE INSTALLATION GUIDE:\n\n"
+            "If automatic download failed or you are offline:\n\n"
+            f"1. Download Rclone for your OS from: https://rclone.org/downloads/\n"
+            f"2. Extract the zip file and find '{rclone_exe_name}'.\n"
+            f"3. Copy '{rclone_exe_name}' directly into either:\n"
+            f"   - The root folder of this software (next to main.py)\n"
+            f"   - Or inside the './rclone/' subfolder\n"
+            "4. Re-run or click 'Start OAuth Authorization'.\n\n"
+            "Would you like to open the official Rclone downloads page in your web browser now?"
+        )
+        reply = QMessageBox.information(
+            self,
+            "Manual Rclone Setup Guide",
+            msg,
+            QMessageBox.Yes | QMessageBox.No,
+            QMessageBox.Yes
+        )
+        if reply == QMessageBox.Yes:
+            import webbrowser
+            webbrowser.open("https://rclone.org/downloads/")
+
     def on_download_finished(self, path):
         self.rclone_bin = path
         self.progress_bar.setVisible(False)
@@ -745,9 +791,14 @@ class RcloneConfiguratorApp(QMainWindow):
 
     def on_download_error(self, err):
         self.progress_bar.setVisible(False)
-        self.lbl_rclone_status.setText("Status: Automatic Download Failed")
+        self.lbl_rclone_status.setText("Status: Automatic Download Failed (Manual setup needed)")
         self.lbl_rclone_status.setStyleSheet("color: #dc2626; font-weight: bold;")
-        QMessageBox.critical(self, "Error", f"Failed to download Rclone automatically:\n{err}")
+        self.txt_output.append(
+            f"\n--- RCLONE AUTOMATIC DOWNLOAD FAILED ---\n"
+            f"Error: {err}\n"
+            f"Please download rclone.exe manually from https://rclone.org/downloads/ and place it in the project root folder.\n"
+        )
+        self.show_manual_rclone_guide()
 
     def kill_existing_rclone_processes(self):
         try:
@@ -776,7 +827,14 @@ class RcloneConfiguratorApp(QMainWindow):
 
         rclone_path = self.find_rclone()
         if not rclone_path and not os.path.exists(self.rclone_bin):
-            QMessageBox.warning(self, "Rclone Missing", "Rclone binary is not available yet. Please wait for the automatic download to finish.")
+            rclone_exe_name = "rclone.exe" if platform.system().lower() == "windows" else "rclone"
+            QMessageBox.warning(
+                self,
+                "Rclone Binary Missing",
+                f"Rclone executable ('{rclone_exe_name}') was not found and automatic download failed.\n\n"
+                f"Please place '{rclone_exe_name}' directly into the project root folder (next to main.py) or inside the './rclone/' directory."
+            )
+            self.show_manual_rclone_guide()
             return
 
         # Clean up any lingering rclone processes holding port 53682
