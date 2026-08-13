@@ -28,12 +28,13 @@ def find_logo_file():
     return None
 
 def get_logo_data_uri(logo_path, size=96):
+    fallback_url = "https://raw.githubusercontent.com/dilharamms/GOIndex-Easy-Deploy/refs/heads/main/logo.png"
     if not logo_path or not os.path.exists(logo_path):
-        return "https://raw.githubusercontent.com/cheems/goindex-extended/master/images/favicon.png"
+        return fallback_url
     try:
         pixmap = QPixmap(logo_path)
         if pixmap.isNull():
-            return "https://raw.githubusercontent.com/cheems/goindex-extended/master/images/favicon.png"
+            return fallback_url
         scaled_pixmap = pixmap.scaled(size, size, Qt.KeepAspectRatio, Qt.SmoothTransformation)
         ba = QByteArray()
         buffer = QBuffer(ba)
@@ -42,7 +43,7 @@ def get_logo_data_uri(logo_path, size=96):
         b64_str = ba.toBase64().data().decode("utf-8")
         return f"data:image/png;base64,{b64_str}"
     except Exception:
-        return "https://raw.githubusercontent.com/cheems/goindex-extended/master/images/favicon.png"
+        return fallback_url
 
 def parse_github_url(url_str):
     url_str = (url_str or "").strip()
